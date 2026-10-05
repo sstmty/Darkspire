@@ -1,0 +1,8 @@
+# Godot
+game/.godot/
+*.import.tmp
+# builds
+build/
+dist/
+# python
+__pycache__/

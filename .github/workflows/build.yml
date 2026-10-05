@@ -1,0 +1,57 @@
+name: Build game
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.5"
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot and export templates
+        run: |
+          base=https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable
+          curl -sSL -o godot.zip $base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q godot.zip && mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sSL -o templates.tpz $base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          dir=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p $dir
+          unzip -q -j templates.tpz "templates/version.txt" "templates/windows_release_x86_64.exe" "templates/linux_release.x86_64" -d $dir
+
+      - name: Export
+        run: |
+          cd game
+          godot --headless --import || true
+          mkdir -p ../build/windows ../build/linux
+          godot --headless --export-release "Windows" ../build/windows/Darkspire.exe
+          godot --headless --export-release "Linux" ../build/linux/Darkspire.x86_64
+
+      - name: Package
+        run: |
+          ver=${GITHUB_REF_NAME#v}
+          [ "$GITHUB_REF_TYPE" = "tag" ] || ver=dev
+          mkdir -p dist
+          cp dist_readme.txt build/windows/README.txt
+          cp dist_readme.txt build/linux/README.txt
+          (cd build/windows && zip -9 -r ../../dist/Darkspire-$ver-windows.zip .)
+          (cd build/linux && chmod +x Darkspire.x86_64 && zip -9 -r ../../dist/Darkspire-$ver-linux.zip .)
+          (cd dist && sha256sum *.zip > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darkspire-builds
+          path: dist/
+
+      - name: Attach to release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
