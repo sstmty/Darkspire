@@ -4,8 +4,8 @@ config_version=5
 [application]
 
 config/name="Darkspire"
-config/description="Пиксельный soulslike с видом сбоку. Пролог и глава 1."
-config/version="0.2.0"
+config/description="Low-poly 3D soulslike: вид сверху, сзади и от первого лица. Пролог и глава 1."
+config/version="0.3.0"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://assets/icon.png"
@@ -16,6 +16,7 @@ boot_splash/show_image=false
 
 Data="*res://scripts/data.gd"
 Sfx="*res://scripts/sfx.gd"
+Settings="*res://scripts/settings.gd"
 Game="*res://scripts/game.gd"
 
 [display]
@@ -24,7 +25,8 @@ window/size/viewport_width=640
 window/size/viewport_height=360
 window/size/window_width_override=1280
 window/size/window_height_override=720
-window/stretch/mode="viewport"
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/stretch/scale_mode="integer"
 
 [gui]

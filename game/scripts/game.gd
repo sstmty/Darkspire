@@ -21,46 +21,10 @@ var autotest := false  # developer self-play mode, see main.gd
 var _frames_cache := {}
 var _chars := {}
 
-const KEYS := {
-	"left": [KEY_A, KEY_LEFT], "right": [KEY_D, KEY_RIGHT], "up": [KEY_W, KEY_UP],
-	"jump": [KEY_SPACE, KEY_K], "attack": [KEY_J], "roll": [KEY_SHIFT, KEY_L], "heal": [KEY_F, KEY_R],
-	"interact": [KEY_E], "memory": [KEY_TAB], "pause": [KEY_ESCAPE],
-}
-const PAD := {
-	"left": JOY_BUTTON_DPAD_LEFT, "right": JOY_BUTTON_DPAD_RIGHT, "jump": JOY_BUTTON_A, "attack": JOY_BUTTON_X,
-	"roll": JOY_BUTTON_B, "heal": JOY_BUTTON_Y, "interact": JOY_BUTTON_RIGHT_SHOULDER,
-	"memory": JOY_BUTTON_BACK, "pause": JOY_BUTTON_START,
-}
-
-
 func _ready() -> void:
 	_chars = JSON.parse_string(FileAccess.get_file_as_string("res://assets/chars/chars.json"))
 	_build_theme()
 	get_tree().root.theme = theme
-	_setup_input()
-
-
-## Physical keys, so WASD works on a Russian keyboard layout too.
-func _setup_input() -> void:
-	for action in KEYS:
-		if not InputMap.has_action(action):
-			InputMap.add_action(action, 0.3)
-		for k in KEYS[action]:
-			var e := InputEventKey.new()
-			e.physical_keycode = k
-			InputMap.action_add_event(action, e)
-		if PAD.has(action):
-			var j := InputEventJoypadButton.new()
-			j.button_index = PAD[action]
-			InputMap.action_add_event(action, j)
-	for pair in [["left", -1.0], ["right", 1.0]]:
-		var m := InputEventJoypadMotion.new()
-		m.axis = JOY_AXIS_LEFT_X
-		m.axis_value = pair[1]
-		InputMap.action_add_event(pair[0], m)
-	var mb := InputEventMouseButton.new()
-	mb.button_index = MOUSE_BUTTON_LEFT
-	InputMap.action_add_event("attack", mb)
 
 
 # ---------------------------------------------------------------- theme

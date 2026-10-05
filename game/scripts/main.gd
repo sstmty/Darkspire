@@ -4,8 +4,9 @@ extends Node
 const SCREENS := {
 	"menu": preload("res://scripts/screens/menu.gd"),
 	"intro": preload("res://scripts/screens/intro.gd"),
-	"level": preload("res://scripts/screens/level.gd"),
+	"level": preload("res://scripts/screens/level3d.gd"),
 	"ending": preload("res://scripts/screens/ending.gd"),
+	"preview3d": preload("res://scripts/screens/preview3d.gd"),
 }
 
 var current: Node
@@ -62,11 +63,13 @@ func _screenshot_mode(args: PackedStringArray) -> void:
 	Game.new_game()
 	var extra := args[6] if args.size() > 6 else ""
 	var params := {}
+	if screen == "preview3d":
+		params["pose"] = args[3]
 	if screen == "level":
 		params["level"] = args[3]
 		for k in Data.DIALOGS:
 			Game.flags["seen_" + k] = true
-		if extra != "":
+		if extra != "" and extra != "solo":
 			Game.flags["nayra"] = true
 			Game.flags["shepherd_met"] = extra == "boss"
 	fade.color.a = 0.0
@@ -75,10 +78,20 @@ func _screenshot_mode(args: PackedStringArray) -> void:
 	if current.has_method("setup"):
 		current.setup(params)
 	if screen == "level" and args.size() > 4:
-		current.player.position.x = int(args[4]) * 16 + 8
+		var w: Node = current.world
+		var sd := float(args[4])
+		current.player.global_position = w.point_at(sd, 0.0) + Vector3(0, 0.2, 0)
+		current.player.yaw = w.yaw_along(sd)
+		current.cam.yaw = current.player.yaw
 		if current.nayra:
-			current.nayra.position.x = current.player.position.x - 24
-		current.camera.reset_smoothing()
+			current.nayra.global_position = w.point_at(sd - 1.5, -1.0) + Vector3(0, 0.2, 0)
+		current.horse.global_position = w.point_at(sd + 1.0, 2.5) + Vector3(0, 0.2, 0)
+		current.horse.yaw = current.player.yaw
+		if extra in ["top", "first"]:
+			current.cam.set_mode(extra)
+		if extra == "ride":
+			current.player.mount(current.horse)
+		current.cam.snap()
 	var wait := float(args[5]) if args.size() > 5 else 2.0
 	await get_tree().create_timer(wait).timeout
 	if screen == "level" and Data.DIALOGS.has(extra):

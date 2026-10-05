@@ -35,9 +35,15 @@ func play(name: String, pitch: float = 1.0) -> void:
 		if not p.playing:
 			p.stream = _sounds[name]
 			p.pitch_scale = pitch * randf_range(0.94, 1.06)
-			p.volume_db = linear_to_db(volume)
+			p.volume_db = linear_to_db(maxf(0.0001, volume))
 			p.play()
 			return
+
+
+func set_volumes(effects: float, tune: float) -> void:
+	volume = effects
+	music_volume = tune
+	_music.volume_db = linear_to_db(maxf(0.0001, music_volume * 0.6))
 
 
 func music(name: String) -> void:
@@ -51,7 +57,7 @@ func music(name: String) -> void:
 		var spec: Array = SONGS[name]
 		_sounds["music_" + name] = _wav(_song(spec[0], spec[1], spec[2]), true)
 	_music.stream = _sounds["music_" + name]
-	_music.volume_db = linear_to_db(music_volume * 0.6)
+	_music.volume_db = linear_to_db(maxf(0.0001, music_volume * 0.6))
 	_music.play()
 
 

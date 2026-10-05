@@ -2,6 +2,9 @@ extends Node2D
 ## Title screen.
 
 const BACKDROP := preload("res://scripts/screens/backdrop.gd")
+const SETTINGS_PANEL := preload("res://scripts/ui/settings_panel.gd")
+
+var settings: PanelContainer
 
 var help_panel: PanelContainer
 
@@ -45,24 +48,28 @@ func setup(_params: Dictionary) -> void:
 			Game.goto("world"), 12)
 	cont.disabled = not Game.has_save()
 	box.add_child(cont)
+	box.add_child(Game.button("Настройки", func(): settings.visible = true, 12))
 	box.add_child(Game.button("Как играть", func(): help_panel.visible = not help_panel.visible, 12))
 	box.add_child(Game.button("Выход", func(): get_tree().quit(), 12))
 	var ver := Game.label("v%s" % ProjectSettings.get_setting("application/config/version"), 8, Color("6a6070"))
 	ver.position = Vector2(6, 346)
 	ui.add_child(ver)
 
+	settings = SETTINGS_PANEL.new()
+	settings.visible = false
+	ui.add_child(settings)
 	help_panel = PanelContainer.new()
 	help_panel.position = Vector2(150, 110)
 	help_panel.custom_minimum_size = Vector2(340, 0)
 	help_panel.visible = false
-	var help := Game.label("""A/D или стрелки: идти. Пробел: прыжок.
-J или левая кнопка мыши: удар, нажмите дважды для серии.
-Shift: перекат, он спасает от удара. F: целебная настойка.
-E: отдохнуть у Угля Памяти. Это сохраняет игру, но враги возвращаются.
-Tab: Память. Esc: пауза.
+	var help := Game.label("""WASD: идти, Shift: бег, Пробел: прыжок.
+ЛКМ: удар, нажмите дважды для серии. ПКМ или Ctrl: перекат.
+R: целебная настойка. E: Угль Памяти и лошадь. Q: захват цели.
+V или колесо мыши: камера сверху, сзади или от первого лица.
+Tab: Память. Esc: пауза. F11: полный экран.
 
 Said не умирает окончательно. Каждая смерть отнимает одно воспоминание.
-Геймпад тоже работает.""", 10)
+Все клавиши можно поменять в настройках. Геймпад тоже работает.""", 10)
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help.custom_minimum_size = Vector2(320, 0)
 	var hb := VBoxContainer.new()

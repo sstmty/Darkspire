@@ -192,15 +192,26 @@ func _fill_memory() -> void:
 	memory_list.add_child(d)
 
 
+const SETTINGS_PANEL := preload("res://scripts/ui/settings_panel.gd")
+var settings: PanelContainer
+
+
 func _build_pause() -> void:
+	settings = SETTINGS_PANEL.new()
+	settings.visible = false
+	settings.closed.connect(func(): pause_panel.visible = true)
+	add_child(settings)
 	var pb := _panel(Vector2(200, 70), 240)
 	pause_panel = pb[0]
 	var box: VBoxContainer = pb[1]
 	var t := Game.label("Пауза", 16, Color("f0d890"))
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(t)
-	var keys := Game.label("A/D: идти   Пробел: прыжок\nJ или ЛКМ: удар (дважды: серия)\nShift: перекат   F: настойка\nE: отдых у Угля   Tab: Память", 9, Color("c8b8a0"))
+	var keys := Game.label("Клавиши можно поменять в настройках.\nF11: полный экран.", 9, Color("c8b8a0"))
 	box.add_child(keys)
+	box.add_child(Game.button("Настройки", func():
+		pause_panel.visible = false
+		settings.visible = true, 12))
 	box.add_child(Game.button("Продолжить", func(): _toggle(pause_panel), 12))
 	box.add_child(Game.button("В главное меню", func():
 		get_tree().paused = false
@@ -215,6 +226,10 @@ func _toggle(panel: PanelContainer) -> void:
 	if open and panel == memory_panel:
 		_fill_memory()
 	get_tree().paused = open
+	if open:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		settings.visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -224,5 +239,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_toggle(memory_panel)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("pause"):
+		if settings.visible:
+			return
 		_toggle(pause_panel if not memory_panel.visible else memory_panel)
 		get_viewport().set_input_as_handled()
