@@ -22,7 +22,7 @@ func _physics_process(dt: float) -> void:
 	cast_cd = maxf(0.0, cast_cd - dt)
 	apply_gravity(dt)
 	var p: Node = level.player
-	var follow: Vector3 = p.global_position - p.forward() * 1.8 + Vector3(cos(p.yaw), 0, -sin(p.yaw)) * -1.0
+	var follow: Vector3 = p.global_position - p.forward() * 0.5 + Vector3(cos(p.yaw), 0, -sin(p.yaw)) * -1.7
 	if level.busy or not p.alive():
 		velocity.x = 0.0
 		velocity.z = 0.0
@@ -72,7 +72,7 @@ func _physics_process(dt: float) -> void:
 					break
 	move_and_slide()
 	if global_position.distance_to(p.global_position) > 26.0 or global_position.y < level.death_y:
-		global_position = p.global_position - p.forward() * 1.5 + Vector3(0, 0.5, 0)
+		global_position = p.global_position - p.forward() * 0.5 + Vector3(cos(p.yaw), 0, -sin(p.yaw)) * -1.7 + Vector3(0, 0.5, 0)
 		velocity = Vector3.ZERO
 		level.burst(center(), Color(0.4, 0.75, 1.0), 16)
 	rig.rotation.y = yaw

@@ -105,7 +105,11 @@ func _update(dt: float, instant: bool) -> void:
 			cam.global_transform = Transform3D(tb, cam.global_position.lerp(pos, k))
 		_:
 			var pivot := head + Vector3(0, 0.15, 0)
-			var want := pivot + basis * Vector3(0.55, 0.0, dist)
+			var extra := 0.0
+			if target.get("riding") != null:
+				extra = 2.5
+				pivot.y += 0.6
+			var want := pivot + basis * Vector3(0.55, 0.0, dist + extra)
 			var space := get_world_3d().direct_space_state
 			var q := PhysicsRayQueryParameters3D.create(pivot, want)
 			q.collision_mask = 1

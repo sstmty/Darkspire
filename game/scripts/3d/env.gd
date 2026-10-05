@@ -3,9 +3,9 @@ extends RefCounted
 
 const THEMES := {
 	"hollowd": {
-		"sky_top": Color("1a0c10"), "sky_horizon": Color("8a3a22"), "ground": Color("2a1610"),
-		"fog": Color("3a1a14"), "fog_density": 0.006, "sun": Color("ffb88a"), "sun_energy": 1.3,
-		"sun_rot": Vector3(-0.55, 0.6, 0), "ambient": Color("5a4448"), "ambient_energy": 0.5,
+		"sky_top": Color("1a0c10"), "sky_horizon": Color("6e3a30"), "ground": Color("241a18"),
+		"fog": Color("2e2226"), "fog_density": 0.006, "sun": Color("f0c8b0"), "sun_energy": 1.2,
+		"sun_rot": Vector3(-0.55, 0.6, 0), "ambient": Color("50485a"), "ambient_energy": 0.55,
 	},
 	"border": {
 		"sky_top": Color("10141c"), "sky_horizon": Color("5a6474"), "ground": Color("1a1c20"),

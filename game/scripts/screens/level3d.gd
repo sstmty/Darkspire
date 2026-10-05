@@ -450,10 +450,10 @@ func flash(c: Color) -> void:
 	hud.flash(c)
 
 
-func burst(pos: Vector3, color: Color, n: int) -> void:
+func burst(pos: Vector3, color: Color, n: int, size := 0.08) -> void:
 	var p := CPUParticles3D.new()
 	var q := QuadMesh.new()
-	q.size = Vector2(0.08, 0.08)
+	q.size = Vector2(size, size)
 	q.material = world.part_mat(Color.WHITE, false)
 	p.mesh = q
 	p.position = pos
@@ -480,4 +480,4 @@ func bind_flash(a: Node3D, b: Node3D) -> void:
 	var to: Vector3 = b.center()
 	var n := 12
 	for k in n:
-		burst(from.lerp(to, float(k) / n), Color(0.5, 0.85, 1.0), 2)
+		burst(from.lerp(to, float(k) / n), Color(0.5, 0.85, 1.0), 2, 0.035)
