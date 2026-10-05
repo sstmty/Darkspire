@@ -1,35 +1,66 @@
 extends Node
-## Global state: hero, army, map progress, saving, screens and shared UI theme.
+## Global state: the hunter's progress, saving, sprites, input map and the shared UI theme.
 
 const SAVE_PATH := "user://darkspire_save.json"
-const MAX_SLOTS := 7
+const FLASKS := 3
 
 var theme: Theme
 var font: FontFile  # Press Start 2P: body text, crisp at 8 / 16 / 32
 var small_font: FontFile  # Tiny5: compact labels, crisp at 8 / 16
 var main: Node  # set by main.gd
 
-var hero := {}
-var army: Array = []  # [{"id": String, "count": int}]
-var gold := 0
-var cleared := {}  # "x,y" -> true
-var explored := PackedByteArray()
-var hero_pos := Vector2i.ZERO
+var level := "hollowd"
+var checkpoint := -1  # index of the Угль Памяти last rested at in this level, -1 = level start
+var flasks := FLASKS
+var flask_max := FLASKS
+var lost: Array = []  # indices into Data.MEMORIES the Spire has taken
 var flags := {}
-var recruit_pool := {}
-var stats := {"battles": 0, "killed": 0, "lost": 0}
-
-var pending := {}
-var autotest := false  # developer self-play mode, see main.gd  # battle in progress: {"event": key, "pos": Vector2i, "battle": id}
+var stats := {"kills": 0, "deaths": 0}
+var autotest := false  # developer self-play mode, see main.gd
 
 var _frames_cache := {}
-var _unit_meta := {}
+var _chars := {}
+
+const KEYS := {
+	"left": [KEY_A, KEY_LEFT], "right": [KEY_D, KEY_RIGHT], "up": [KEY_W, KEY_UP],
+	"jump": [KEY_SPACE, KEY_K], "attack": [KEY_J], "roll": [KEY_SHIFT, KEY_L], "heal": [KEY_F, KEY_R],
+	"interact": [KEY_E], "memory": [KEY_TAB], "pause": [KEY_ESCAPE],
+}
+const PAD := {
+	"left": JOY_BUTTON_DPAD_LEFT, "right": JOY_BUTTON_DPAD_RIGHT, "jump": JOY_BUTTON_A, "attack": JOY_BUTTON_X,
+	"roll": JOY_BUTTON_B, "heal": JOY_BUTTON_Y, "interact": JOY_BUTTON_RIGHT_SHOULDER,
+	"memory": JOY_BUTTON_BACK, "pause": JOY_BUTTON_START,
+}
 
 
 func _ready() -> void:
-	_unit_meta = JSON.parse_string(FileAccess.get_file_as_string("res://assets/units/units.json"))
+	_chars = JSON.parse_string(FileAccess.get_file_as_string("res://assets/chars/chars.json"))
 	_build_theme()
 	get_tree().root.theme = theme
+	_setup_input()
+
+
+## Physical keys, so WASD works on a Russian keyboard layout too.
+func _setup_input() -> void:
+	for action in KEYS:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action, 0.3)
+		for k in KEYS[action]:
+			var e := InputEventKey.new()
+			e.physical_keycode = k
+			InputMap.action_add_event(action, e)
+		if PAD.has(action):
+			var j := InputEventJoypadButton.new()
+			j.button_index = PAD[action]
+			InputMap.action_add_event(action, j)
+	for pair in [["left", -1.0], ["right", 1.0]]:
+		var m := InputEventJoypadMotion.new()
+		m.axis = JOY_AXIS_LEFT_X
+		m.axis_value = pair[1]
+		InputMap.action_add_event(pair[0], m)
+	var mb := InputEventMouseButton.new()
+	mb.button_index = MOUSE_BUTTON_LEFT
+	InputMap.action_add_event("attack", mb)
 
 
 # ---------------------------------------------------------------- theme
@@ -125,101 +156,67 @@ func button(text: String, cb: Callable, size: int = 10) -> Button:
 
 # ---------------------------------------------------------------- sprites
 
-func unit_meta(id: String) -> Dictionary:
-	return _unit_meta[id]
+func char_meta(id: String) -> Dictionary:
+	return _chars[id]
 
 
-func frames(id: String, mini: bool = false) -> SpriteFrames:
-	var key := id + ("_mini" if mini else "")
-	if _frames_cache.has(key):
-		return _frames_cache[key]
-	var tex: Texture2D = load("res://assets/units/%s.png" % key)
-	var meta: Dictionary = _unit_meta[id]
-	var fw := 32 if mini else int(meta["fw"])
-	var fh := 32 if mini else int(meta["fh"])
+func frames(id: String) -> SpriteFrames:
+	if _frames_cache.has(id):
+		return _frames_cache[id]
+	var tex: Texture2D = load("res://assets/chars/%s.png" % id)
+	var meta: Dictionary = _chars[id]
+	var fw := int(meta["w"])
+	var fh := int(meta["h"])
 	var sf := SpriteFrames.new()
 	sf.remove_animation("default")
 	for anim in meta["anims"]:
 		var a: Dictionary = meta["anims"][anim]
-		if mini and int(a["row"]) > 1:
-			continue
 		sf.add_animation(anim)
 		sf.set_animation_speed(anim, float(a["fps"]))
-		sf.set_animation_loop(anim, anim in ["idle", "walk"])
+		sf.set_animation_loop(anim, bool(a["loop"]))
 		for f in int(a["frames"]):
 			var at := AtlasTexture.new()
 			at.atlas = tex
 			at.region = Rect2(f * fw, int(a["row"]) * fh, fw, fh)
 			sf.add_frame(anim, at)
-	_frames_cache[key] = sf
+	_frames_cache[id] = sf
 	return sf
 
 
-func icon(name: String) -> Texture2D:
-	return load("res://assets/ui/%s.png" % name)
+## Seconds an animation takes to play once.
+func anim_len(id: String, anim: String) -> float:
+	var a: Dictionary = _chars[id]["anims"][anim]
+	return float(a["frames"]) / float(a["fps"])
+
+
+func hit_frame(id: String, anim: String) -> int:
+	return int(_chars[id]["anims"][anim]["hit"])
 
 
 # ---------------------------------------------------------------- state
 
 func new_game() -> void:
-	hero = {"name": "Кайрен Вейл", "level": 1, "xp": 0, "atk": 1, "def": 1}
-	army = []
-	for s in Data.START_ARMY:
-		army.append({"id": s[0], "count": s[1]})
-	gold = 250
-	cleared = {}
-	explored = PackedByteArray()
-	hero_pos = Vector2i(-1, -1)
+	level = "hollowd"
+	checkpoint = -1
+	flask_max = FLASKS
+	flasks = FLASKS
+	lost = []
 	flags = {}
-	recruit_pool = Data.RECRUIT_POOL.duplicate()
-	stats = {"battles": 0, "killed": 0, "lost": 0}
-	pending = {}
+	stats = {"kills": 0, "deaths": 0}
 
 
-func xp_for(level: int) -> int:
-	return 60 * level * (level + 1) / 2
-
-
-## Adds XP and returns the list of level-up messages.
-func add_xp(amount: int) -> Array:
-	var msgs := []
-	hero["xp"] += amount
-	while hero["xp"] >= xp_for(hero["level"]):
-		hero["level"] += 1
-		if hero["level"] % 2 == 0:
-			hero["atk"] += 1
-			msgs.append("Уровень %d! Атака героя +1." % hero["level"])
-		else:
-			hero["def"] += 1
-			msgs.append("Уровень %d! Защита героя +1." % hero["level"])
-	return msgs
-
-
-func add_units(id: String, n: int) -> bool:
-	for s in army:
-		if s["id"] == id:
-			s["count"] += n
-			return true
-	if army.size() >= MAX_SLOTS:
-		return false
-	army.append({"id": id, "count": n})
-	return true
-
-
-func army_power() -> int:
-	var p := 0
-	for s in army:
-		var d: Dictionary = Data.UNITS[s["id"]]
-		p += int(s["count"]) * int(d["hp"])
-	return p
-
-
-func is_cleared(p: Vector2i) -> bool:
-	return cleared.has("%d,%d" % [p.x, p.y])
-
-
-func set_cleared(p: Vector2i) -> void:
-	cleared["%d,%d" % [p.x, p.y]] = true
+## The Spire takes a memory. index -1 takes the next one still remembered.
+## Returns its text, or "" when nothing is left to forget.
+func forget(index: int = -1) -> String:
+	if index < 0:
+		for i in range(1, Data.MEMORIES.size()):
+			if not lost.has(i):
+				index = i
+				break
+	if index < 0 or lost.has(index):
+		return ""
+	lost.append(index)
+	return Data.MEMORIES[index]
 
 
 # ---------------------------------------------------------------- save / load
@@ -230,9 +227,8 @@ func has_save() -> bool:
 
 func save_game() -> bool:
 	var d := {
-		"version": 1, "hero": hero, "army": army, "gold": gold, "cleared": cleared,
-		"explored": Marshalls.raw_to_base64(explored), "hero_pos": [hero_pos.x, hero_pos.y],
-		"flags": flags, "recruit_pool": recruit_pool, "stats": stats,
+		"version": 2, "level": level, "checkpoint": checkpoint, "flasks": flasks, "flask_max": flask_max,
+		"lost": lost, "flags": flags, "stats": stats,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -245,34 +241,20 @@ func load_game() -> bool:
 	if not has_save():
 		return false
 	var d = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if typeof(d) != TYPE_DICTIONARY:
+	if typeof(d) != TYPE_DICTIONARY or int(d.get("version", 0)) != 2:
 		return false
-	hero = d["hero"]
-	for k in ["level", "xp", "atk", "def"]:
-		hero[k] = int(hero[k])
-	army = []
-	for s in d["army"]:
-		army.append({"id": s["id"], "count": int(s["count"])})
-	gold = int(d["gold"])
-	cleared = d["cleared"]
-	explored = Marshalls.base64_to_raw(d["explored"])
-	hero_pos = Vector2i(int(d["hero_pos"][0]), int(d["hero_pos"][1]))
+	level = d["level"]
+	checkpoint = int(d["checkpoint"])
+	flasks = int(d["flasks"])
+	flask_max = int(d["flask_max"])
+	lost = []
+	for i in d["lost"]:
+		lost.append(int(i))
 	flags = d["flags"]
-	recruit_pool = {}
-	for k in d["recruit_pool"]:
-		recruit_pool[k] = int(d["recruit_pool"][k])
 	stats = {}
 	for k in d["stats"]:
 		stats[k] = int(d["stats"][k])
-	pending = {}
 	return true
-
-
-func autotest_choice(options: Array) -> int:
-	# recruit menu: buy the first offer, then leave; chests: take gold
-	if options.size() > 1 and str(options[0]).contains("нанять"):
-		return 0
-	return options.size() - 1 if str(options[-1]) == "Уйти" and gold < 30 else 0
 
 
 # ---------------------------------------------------------------- screens

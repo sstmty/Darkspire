@@ -4,8 +4,7 @@ extends Node
 const SCREENS := {
 	"menu": preload("res://scripts/screens/menu.gd"),
 	"intro": preload("res://scripts/screens/intro.gd"),
-	"world": preload("res://scripts/screens/world.gd"),
-	"battle": preload("res://scripts/screens/battle.gd"),
+	"level": preload("res://scripts/screens/level.gd"),
 	"ending": preload("res://scripts/screens/ending.gd"),
 }
 
@@ -36,8 +35,8 @@ func _ready() -> void:
 
 
 func change_screen(name: String, params: Dictionary = {}) -> void:
-	if _busy:
-		return
+	while _busy:
+		await get_tree().process_frame
 	_busy = true
 	var tw := create_tween()
 	tw.tween_property(fade, "color:a", 1.0, 0.25)
@@ -55,75 +54,54 @@ func change_screen(name: String, params: Dictionary = {}) -> void:
 	_busy = false
 
 
+## Developer screenshots: --shot <screen> <file> [level] [column] [wait] [extra]
+## extra: "nayra" (she has joined), "boss" (walk into the arena), or a dialog key.
 func _screenshot_mode(args: PackedStringArray) -> void:
 	var screen := args[1]
 	var file := args[2]
 	Game.new_game()
+	var extra := args[6] if args.size() > 6 else ""
 	var params := {}
-	if screen == "battle":
-		params = {"battle": args[3] if args.size() > 3 else "village", "auto": true}
-	elif screen == "world" and args.size() > 3:
-		Game.hero_pos = Vector2i(int(args[3]), int(args[4]))
-		Game.flags["start_done"] = true
+	if screen == "level":
+		params["level"] = args[3]
+		for k in Data.DIALOGS:
+			Game.flags["seen_" + k] = true
+		if extra != "":
+			Game.flags["nayra"] = true
+			Game.flags["shepherd_met"] = extra == "boss"
 	fade.color.a = 0.0
 	current = SCREENS[screen].new()
 	add_child(current)
 	if current.has_method("setup"):
 		current.setup(params)
+	if screen == "level" and args.size() > 4:
+		current.player.position.x = int(args[4]) * 16 + 8
+		if current.nayra:
+			current.nayra.position.x = current.player.position.x - 24
+		current.camera.reset_smoothing()
 	var wait := float(args[5]) if args.size() > 5 else 2.0
-	if screen == "battle" and args.size() > 4:
-		wait = float(args[4])
 	await get_tree().create_timer(wait).timeout
-	if screen == "world" and args.size() > 6:
-		current._dialog(Data.DIALOGS[args[6]])
+	if screen == "level" and Data.DIALOGS.has(extra):
+		current.talk(extra)
 		await get_tree().create_timer(1.5).timeout
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(file)
 	get_tree().quit()
 
 
-## Self-play: walks the hero through every event of chapter I and logs the outcome.
+## Self-play: the bot walks through the prologue and chapter 1 and logs what happens.
 func _autotest() -> void:
 	Game.autotest = true
-	Engine.time_scale = 6.0
 	Game.new_game()
-	change_screen("world")
-	var order := ["g", "1", "g", "2", "R", "g", "g", "3", "c", "5", "c", "S", "4", "6", "g", "c", "g", "g", "c", "R", "7"]
-	var steps := 0
-	while steps < 600:
-		steps += 1
-		await get_tree().create_timer(0.5).timeout
-		if _busy or current == null or not current.has_method("_go") or current.busy:
-			continue
+	change_screen("level")
+	var t := 0
+	while t < 1800:
+		await get_tree().create_timer(1.0).timeout
+		t += 1
 		if Game.flags.get("chapter1_done", false):
 			break
-		var target := Vector2i(-1, -1)
-		while not order.is_empty():
-			target = _next_target(current, order[0])
-			if target != Vector2i(-1, -1):
-				break
-			order.pop_front()
-		if order.is_empty():
-			continue
-		var key: String = order.pop_front()
-		print("GO ", key, " ", target, " gold=", Game.gold, " lvl=", Game.hero["level"])
-		await current._go(target)
-	print("AUTOTEST DONE chapter_done=", Game.flags.get("chapter1_done", false), " stats=", Game.stats, " army=", Game.army)
+		if t % 15 == 0 and current != null and current.get("player") != null:
+			var p: Node = current.player
+			print("T%d %s x=%d hp=%d flasks=%d boss=%s" % [t, Game.level, int(p.position.x), int(p.hp), Game.flasks, current.boss_active])
+	print("AUTOTEST DONE chapter1_done=", Game.flags.get("chapter1_done", false), " t=", t, " stats=", Game.stats, " lost=", Game.lost)
 	get_tree().quit()
-
-
-func _next_target(w, key: String) -> Vector2i:
-	var best := Vector2i(-1, -1)
-	var bd := 1 << 30
-	for y in w.H:
-		for x in w.W:
-			var p := Vector2i(x, y)
-			if w.ch(p) != key:
-				continue
-			if key != "R" and key != "S" and Game.is_cleared(p):
-				continue
-			var d := (p - Game.hero_pos).length_squared()
-			if d < bd:
-				bd = d
-				best = p
-	return best

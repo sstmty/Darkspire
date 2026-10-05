@@ -15,7 +15,6 @@ var _tw: Tween
 
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	size = Vector2(640, 360)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var shade := ColorRect.new()
 	shade.color = Color(0, 0, 0, 0.25)
@@ -23,24 +22,24 @@ func _init() -> void:
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
 	var panel := Panel.new()
-	panel.position = Vector2(40, 270)
+	panel.position = Vector2(40, 8)
 	panel.size = Vector2(560, 80)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(panel)
 	portrait = TextureRect.new()
-	portrait.position = Vector2(56, 286)
+	portrait.position = Vector2(56, 24)
 	portrait.size = Vector2(48, 48)
 	add_child(portrait)
 	name_label = Game.label("", 10, Color("e0b55a"))
-	name_label.position = Vector2(114, 278)
+	name_label.position = Vector2(114, 16)
 	add_child(name_label)
 	text_label = Game.label("", 10)
-	text_label.position = Vector2(114, 292)
+	text_label.position = Vector2(114, 30)
 	text_label.size = Vector2(470, 50)
 	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(text_label)
 	hint = Game.label("▼", 8, Color("8a6b3a"))
-	hint.position = Vector2(584, 336)
+	hint.position = Vector2(584, 74)
 	add_child(hint)
 	choice_box = VBoxContainer.new()
 	choice_box.position = Vector2(200, 180)
@@ -56,7 +55,7 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_E]:
+	if event.pressed and not event.echo and event.physical_keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_E, KEY_J]:
 		_next()
 		get_viewport().set_input_as_handled()
 
@@ -118,9 +117,15 @@ func ask(speaker: String, text: String, options: Array) -> int:
 		var b := Game.button(options[i], func(): chosen.emit(i))
 		choice_box.add_child(b)
 	await get_tree().process_frame
-	choice_box.position = Vector2((640 - choice_box.size.x) / 2.0, 262 - choice_box.size.y)
+	choice_box.position = Vector2((640 - choice_box.size.x) / 2.0, 100)
 	var idx: int = await chosen
 	for c in choice_box.get_children():
 		c.queue_free()
 	await get_tree().process_frame
 	return idx
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton and event.pressed:
+		_next()
+		get_viewport().set_input_as_handled()
